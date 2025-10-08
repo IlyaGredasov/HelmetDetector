@@ -1,3 +1,5 @@
 *.pt
 dataset/
 .venv/
+.idea/
+__pycache__/
