@@ -49,21 +49,42 @@ def rename_files():
         rename_and_merge(img, lbl, TEST_IMAGES, TEST_LABELS)
 
 
-def visualize(img_path):
+def visualize(img_path, save_path=None):
     p = Path(img_path)
     lbl_path = p.parent.parent / "labels" / f"{p.stem}.txt"
-    print(p)
     img = cv2.imread(str(p))
     h, w = img.shape[:2]
-    with open(lbl_path, "r") as f:
-        for line in f:
-            c, cx, cy, bw, bh = map(float, line.split()[:5])
-            x1, y1 = int((cx - bw / 2) * w), int((cy - bh / 2) * h)
-            x2, y2 = int((cx + bw / 2) * w), int((cy + bh / 2) * h)
-            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-    cv2.imshow("vis", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    if lbl_path.exists():
+        with open(lbl_path, "r", encoding="utf-8") as f:
+            for line in f:
+                c, cx, cy, bw, bh = map(float, line.split()[:5])
+                x1, y1 = int((cx - bw/2) * w), int((cy - bh/2) * h)
+                x2, y2 = int((cx + bw/2) * w), int((cy + bh/2) * h)
+                color = (0, 255, 0) if c else (0, 0, 255)
+                cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+                txt = str(int(c))
+                (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                ty = max(0, y1 - 4)
+                cv2.rectangle(img, (x1, ty - th - 6), (x1 + tw + 6, ty), color, -1)
+                cv2.putText(img, txt, (x1 + 3, ty - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2, cv2.LINE_AA)
+    if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(save_path), img)
+    else:
+        cv2.imshow("vis", img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    return img
+
+def visualize_dataset():
+    for split in ['train', 'valid', 'test']:
+        img_dir = DATASET / split / "images"
+        if not img_dir.exists():
+            continue
+        for fname in os.listdir(img_dir):
+            src = img_dir / fname
+            dst = Path("visualized_dataset") / split / fname
+            visualize(src, save_path=dst)
 
 
 def process_labels(dir_path, unwanted_ids=None, replace_map=None):
@@ -131,15 +152,5 @@ def reannotate_persons(images_path, labels_path):
 if __name__ == '__main__':
     rename_files()
     print("Files have been renamed")
-    clear_labels(TRAIN_LABELS, [0, 2])
-    clear_labels(VAL_LABELS, [0, 2])
-    clear_labels(TEST_LABELS, [0, 2])
-    change_label(TRAIN_LABELS, 1, 0)
-    change_label(VAL_LABELS, 1, 0)
-    change_label(TEST_LABELS, 1, 0)
-    print("Labels have been changed")
-    model = YOLO("yolov8l.pt")
-
-    reannotate_persons(TRAIN_IMAGES, TRAIN_LABELS)
-    reannotate_persons(VAL_IMAGES, VAL_LABELS)
-    reannotate_persons(TEST_IMAGES, TEST_LABELS)
+    visualize_dataset()
+    print("Dataset has been visualized")
