@@ -17,6 +17,10 @@ TEST_LABELS = DATASET / "test" / "labels"
 
 
 def rename_and_merge(image_path: Path, label_path: Path, dest_images: Path, dest_labels: Path):
+    """
+    Allow to rename image with corresponding label
+    :return: None
+    """
     global global_counter
 
     new_image_name = f"{global_counter}{image_path.suffix.lower()}"
@@ -32,6 +36,10 @@ def rename_and_merge(image_path: Path, label_path: Path, dest_images: Path, dest
 
 
 def rename_files():
+    """
+    Launch renaming process over all images in the dataset
+    :return: None
+    """
     global global_counter
     for fname in os.listdir(TRAIN_IMAGES):
         img = TRAIN_IMAGES / fname
@@ -50,6 +58,12 @@ def rename_files():
 
 
 def visualize(img_path, save_path=None):
+    """
+    Make image visualization based on label
+    :param img_path: image path
+    :param save_path: if it is not None, function saves visualized image on this path
+    :return: None
+    """
     p = Path(img_path)
     lbl_path = p.parent.parent / "labels" / f"{p.stem}.txt"
     img = cv2.imread(str(p))
@@ -58,15 +72,15 @@ def visualize(img_path, save_path=None):
         with open(lbl_path, "r", encoding="utf-8") as f:
             for line in f:
                 c, cx, cy, bw, bh = map(float, line.split()[:5])
-                x1, y1 = int((cx - bw/2) * w), int((cy - bh/2) * h)
-                x2, y2 = int((cx + bw/2) * w), int((cy + bh/2) * h)
+                x1, y1 = int((cx - bw / 2) * w), int((cy - bh / 2) * h)
+                x2, y2 = int((cx + bw / 2) * w), int((cy + bh / 2) * h)
                 color = (0, 255, 0) if c else (0, 0, 255)
                 cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
                 txt = str(int(c))
                 (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
                 ty = max(0, y1 - 4)
                 cv2.rectangle(img, (x1, ty - th - 6), (x1 + tw + 6, ty), color, -1)
-                cv2.putText(img, txt, (x1 + 3, ty - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2, cv2.LINE_AA)
+                cv2.putText(img, txt, (x1 + 3, ty - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
     if save_path:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(save_path), img)
@@ -76,7 +90,12 @@ def visualize(img_path, save_path=None):
         cv2.destroyAllWindows()
     return img
 
+
 def visualize_dataset():
+    """
+    Make dataset visualization based on label
+    :return: None
+    """
     for split in ['train', 'valid', 'test']:
         img_dir = DATASET / split / "images"
         if not img_dir.exists():
@@ -88,6 +107,13 @@ def visualize_dataset():
 
 
 def process_labels(dir_path, unwanted_ids=None, replace_map=None):
+    """
+    Change image labels
+    :param dir_path: directory path
+    :param unwanted_ids: class ids to be deleted
+    :param replace_map: class ids to be replaced
+    :return: None
+    """
     p = Path(dir_path)
     unwanted_ids = set(unwanted_ids or [])
     replace_map = replace_map or {}
@@ -113,14 +139,26 @@ def process_labels(dir_path, unwanted_ids=None, replace_map=None):
 
 
 def clear_labels(dir_path, unwanted_ids):
+    """
+    Delete unwanted labels
+    :return: None
+    """
     process_labels(dir_path, unwanted_ids=unwanted_ids)
 
 
 def change_label(dir_path, old_id, new_id):
+    """
+    Replace old label with new label
+    :return: None
+    """
     process_labels(dir_path, replace_map={old_id: new_id})
 
 
 def xyxy_to_yolo(x1, y1, x2, y2, w, h):
+    """
+    Convert xyxy-format coordinates to yolo-format coordinates
+    :return: tuple of coordinates
+    """
     bw, bh = (x2 - x1) / w, (y2 - y1) / h
     cx, cy = (x1 + x2) / (2 * w), (y1 + y2) / (2 * h)
     return cx, cy, bw, bh
@@ -128,6 +166,10 @@ def xyxy_to_yolo(x1, y1, x2, y2, w, h):
 
 def add_person_labels(image_path: Path, label_path: Path, model: YOLO, target_class_id: int = 1,
                       source_class_id: int = 0, conf: float = 0.4, iou: float = 0.45):
+    """
+    Add person labels to image
+    :return: None
+    """
     img = cv2.imread(str(image_path))
     h, w = img.shape[:2]
     res = model.predict(source=str(image_path), conf=conf, iou=iou, verbose=False)[0]
@@ -141,11 +183,15 @@ def add_person_labels(image_path: Path, label_path: Path, model: YOLO, target_cl
 
 
 def reannotate_persons(images_path, labels_path):
+    """
+    Reannotate person labels over all the dataset
+    :return: None
+    """
     test_size = len(os.listdir(images_path))
-    for i, fname in enumerate(os.listdir(images_path)):
-        img_path = images_path / fname
-        lbl_path = labels_path / f"{Path(fname).stem}.txt"
-        add_person_labels(img_path, lbl_path, model)
+    for i, file_name in enumerate(os.listdir(images_path)):
+        img_path = images_path / file_name
+        lbl_path = labels_path / f"{Path(file_name).stem}.txt"
+        add_person_labels(img_path, lbl_path, YOLO("yolov8l.pt"))
         print(f"{images_path}: {i + 1}/{test_size}")
 
 

@@ -1,0 +1,16 @@
+// python -m grpc_tools.protoc -I . --python_out=. --grpc_python_out=. camera_stream.proto
+syntax = "proto3";
+package helmet_detector;
+
+message CameraFrame {
+    int32 camera_id = 1;
+    bytes frame = 2;
+    string timestamp = 3;
+}
+
+message EmptyResponse {}
+
+service CameraStreamService {
+    rpc StreamFrames (stream CameraFrame) returns (EmptyResponse);
+}
+
