@@ -18,25 +18,34 @@ def encode_jpg(img) -> bytes:
 
 class CameraStream:
     def __init__(self, camera_id: int, video: str, timeout: float):
-        self.camera_id, self.video, self.timeout = camera_id, video, timeout
+        self.camera_id = camera_id
+        self.video = video
+        self.timeout = timeout
 
     async def frames_generator(self):
         cap = cv2.VideoCapture(self.video)
         try:
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            step = max(1, round(fps * self.timeout))
+            frame_index = 0
             while True:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
                 ok, frame = cap.read()
                 if not ok:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    frame_index = 0
                     continue
+
                 frame = cv2.resize(frame, (cfg.IMG_W, cfg.IMG_H), interpolation=cv2.INTER_LINEAR)
                 yield pb.CameraFrame(
                     camera_id=self.camera_id,
                     frame=encode_jpg(frame),
                     timestamp=datetime.now().isoformat(timespec="seconds"),
                 )
+                frame_index = (frame_index + step) % frame_count
                 await asyncio.sleep(self.timeout)
         except Exception as e:
-            print(e)
+            print(f"[CameraStream {self.camera_id}] error:", e)
         finally:
             cap.release()
 

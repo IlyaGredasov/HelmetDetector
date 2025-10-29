@@ -17,3 +17,5 @@ train_results/
 v1_runs/
 v2_runs/
 visualized_dataset/
+
+*.pstat

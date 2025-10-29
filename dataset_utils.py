@@ -122,11 +122,11 @@ def process_labels(dir_path, unwanted_ids=None, replace_map=None):
         new_lines = []
         with open(txt, "r", encoding="utf-8") as f:
             for line in f:
-                parts = line.strip().split()
+                parts = list(line.strip().split())
                 if not parts:
                     continue
                 try:
-                    cid = int(float(parts[0]))
+                    cid = int(parts[0])
                 except:
                     continue
                 if cid in unwanted_ids:
