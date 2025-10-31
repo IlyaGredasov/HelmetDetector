@@ -6,7 +6,7 @@ from stream.camera_stream import CameraStream
 
 
 async def main():
-    cameras = [CameraStream(camera_id=i, video=cfg.CAMERA_VIDEO_PATH, timeout=cfg.CAMERA_TIMEOUT) for i in
+    cameras = [CameraStream(camera_id=i, video="report_data/test_videos/test_hat.mp4", timeout=cfg.CAMERA_TIMEOUT) for i in
                range(cfg.CAMERAS_COUNT)]
     server = HelmetServer()
     await server.start(cfg.SERVER_BIND_ADDR)

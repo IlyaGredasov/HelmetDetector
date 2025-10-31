@@ -37,12 +37,14 @@ def letterbox(img: np.ndarray, new_shape: Tuple[int, int]) -> Tuple[np.ndarray, 
 def nms(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float) -> List[int]:
     if boxes.size == 0:
         return []
+    boxes = boxes.astype(np.float32, copy=False)
+    scores = scores.astype(np.float32, copy=False)
     x1, y1, x2, y2 = boxes.T
     w = np.maximum(0.0, x2 - x1)
     h = np.maximum(0.0, y2 - y1)
-    pos = np.where((w > 0) & (h > 0))[0]
-    boxes = boxes[pos]
-    scores = scores[pos]
+    valid = np.where((w > 0) & (h > 0))[0]
+    boxes = boxes[valid]
+    scores = scores[valid]
     if boxes.size == 0:
         return []
     x1, y1, x2, y2 = boxes.T
@@ -59,10 +61,9 @@ def nms(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float) -> List[int]:
         ww = np.maximum(0.0, xx2 - xx1)
         hh = np.maximum(0.0, yy2 - yy1)
         inter = ww * hh
-        iou = inter / (areas[i] + areas[order[1:]] - inter + 1e-9)
-        indexes = np.where(iou <= iou_thresh)[0]
-        order = order[indexes + 1]
-    map_back = pos[keep]
+        iou = inter / (areas[i] + areas[order[1:]] - inter + 1e-7)
+        order = order[1:][iou <= iou_thresh]
+    map_back = valid[keep]
     return map_back.tolist()
 
 
@@ -87,10 +88,12 @@ class HelmetDetector:
         self.output_name = self.engine.get_tensor_name(1)
         self.input_np_dtype = self.DTYPE_MAP[self.engine.get_tensor_dtype(self.input_name)]
         self.output_np_dtype = self.DTYPE_MAP[self.engine.get_tensor_dtype(self.output_name)]
+        self.last_shape = None
+        self.h_input = None
+        self.h_output = None
         self.d_input = None
         self.d_output = None
-        self.allocated_input_bytes = 0
-        self.allocated_output_bytes = 0
+        self.event = cuda.Event()
 
     def preprocess(self, images: List[np.ndarray]) -> Tuple[
         np.ndarray, List[Tuple[int, int]], List[float], List[Tuple[int, int]]]:
@@ -99,41 +102,40 @@ class HelmetDetector:
         for i, im_bgr in enumerate(images):
             rgb = cv2.cvtColor(im_bgr, cv2.COLOR_BGR2RGB)
             lb, r, (left, top) = letterbox(rgb, (cfg.IMG_H, cfg.IMG_W))
-            arr = lb.transpose(2, 0, 1).astype(np.float32) / 255.0
+            arr = lb.transpose(2, 0, 1).astype(self.input_np_dtype)
+            arr *= np.array(1 / 255, dtype=self.input_np_dtype)
             batch[i] = arr
             orig_shapes.append((im_bgr.shape[0], im_bgr.shape[1]))
             scales.append(r)
             paddings.append((left, top))
         return batch, orig_shapes, scales, paddings
 
-    def forward(self, batch: np.ndarray) -> np.ndarray:
-        self.context.set_input_shape(self.input_name, tuple(batch.shape))
+    def provide_memory(self, input_shape):
+        if self.last_shape == input_shape:
+            return
+        self.context.set_input_shape(self.input_name, input_shape)
         output_shape = tuple(self.context.get_tensor_shape(self.output_name))
-
-        h_input = np.ascontiguousarray(batch, dtype=self.input_np_dtype)
-        h_output = np.empty(output_shape, dtype=self.output_np_dtype)
-
-        if self.d_input is None or self.allocated_input_bytes < h_input.nbytes:
-            if self.d_input is not None:
-                self.d_input.free()
-            self.d_input = cuda.mem_alloc(h_input.nbytes)
-            self.allocated_input_bytes = h_input.nbytes
-
-        if self.d_output is None or self.allocated_output_bytes < h_output.nbytes:
-            if self.d_output is not None:
-                self.d_output.free()
-            self.d_output = cuda.mem_alloc(h_output.nbytes)
-            self.allocated_output_bytes = h_output.nbytes
-
+        self.h_input = cuda.pagelocked_empty(input_shape, dtype=self.input_np_dtype)
+        self.h_output = cuda.pagelocked_empty(output_shape, dtype=self.output_np_dtype)
+        if self.d_input:
+            self.d_input.free()
+        if self.d_output:
+            self.d_output.free()
+        self.d_input = cuda.mem_alloc(self.h_input.nbytes)
+        self.d_output = cuda.mem_alloc(self.h_output.nbytes)
         self.context.set_tensor_address(self.input_name, int(self.d_input))
         self.context.set_tensor_address(self.output_name, int(self.d_output))
+        self.last_shape = input_shape
 
-        cuda.memcpy_htod_async(self.d_input, h_input, self.stream)
+    def forward(self, batch: np.ndarray) -> np.ndarray:
+        self.provide_memory(tuple(batch.shape))
+        np.copyto(self.h_input, batch, casting='no')
+        cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
         self.context.execute_async_v3(stream_handle=int(self.stream.handle))
-        cuda.memcpy_dtoh_async(h_output, self.d_output, self.stream)
-        self.stream.synchronize()
-
-        return h_output
+        cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
+        self.event.record(self.stream)
+        self.event.synchronize()
+        return self.h_output.copy()
 
     def postprocess(self, output: np.ndarray, original_shapes: List[Tuple[int, int]], scales: List[float],
                     paddings: List[Tuple[int, int]]) -> List[List[Detection]]:

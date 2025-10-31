@@ -3,7 +3,10 @@ from sys import argv
 
 from ultralytics import YOLO
 
-img_size = f"{argv[2]},{argv[3]}"
-model = YOLO(argv[1])
-onnx_model = model.export(format="onnx", opset=12, imgsz=img_size, dynamic=True, simplify=True)
-onnx_path = Path(onnx_model)
+pt_path = Path(argv[1]).resolve()
+model = YOLO(str(pt_path))
+onnx_tmp = Path(
+    model.export(format="onnx", opset=17, imgsz=f"{int(argv[2])},{int(argv[3])}", dynamic=True, simplify=True))
+onnx_out = pt_path.with_suffix(".onnx")
+if onnx_tmp != onnx_out:
+    onnx_tmp.replace(onnx_out)

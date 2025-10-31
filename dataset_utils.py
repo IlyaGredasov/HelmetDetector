@@ -191,7 +191,7 @@ def reannotate_persons(images_path, labels_path):
     for i, file_name in enumerate(os.listdir(images_path)):
         img_path = images_path / file_name
         lbl_path = labels_path / f"{Path(file_name).stem}.txt"
-        add_person_labels(img_path, lbl_path, YOLO("yolov8l.pt"))
+        add_person_labels(img_path, lbl_path, YOLO("models/yolov8l.pt"))
         print(f"{images_path}: {i + 1}/{test_size}")
 
 

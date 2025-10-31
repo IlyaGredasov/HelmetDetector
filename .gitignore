@@ -12,10 +12,7 @@
 __pycache__/
 
 dataset/
-test_videos/
-train_results/
-v1_runs/
-v2_runs/
+report_data/
 visualized_dataset/
 
 *.pstat

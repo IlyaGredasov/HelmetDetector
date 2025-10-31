@@ -16,7 +16,6 @@ class Config:
 
     CAMERAS_COUNT: int = int(os.getenv("CAMERAS_COUNT", 6))
     CAMERA_TIMEOUT: float = float(os.getenv("CAMERA_TIMEOUT", 0.1))
-    CAMERA_VIDEO_PATH: str = str(os.getenv("CAMERA_VIDEO_PATH"))
 
     TRT_DET_THRESH: float = float(os.getenv("TRT_DET_THRESH", 0.4))
     TRT_IOU_THRESH: float = float(os.getenv("TRT_IOU_THRESH", 0.45))
