@@ -13,4 +13,3 @@ message EmptyResponse {}
 service CameraStreamService {
     rpc StreamFrames (stream CameraFrame) returns (EmptyResponse);
 }
-

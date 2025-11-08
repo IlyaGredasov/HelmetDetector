@@ -1,8 +1,11 @@
 import os
 import shutil
 from pathlib import Path
+from typing import List
+from typing import Tuple
 
 import cv2
+import numpy as np
 from ultralytics.models import YOLO
 
 global_counter = 0
@@ -41,19 +44,19 @@ def rename_files():
     :return: None
     """
     global global_counter
-    for fname in os.listdir(TRAIN_IMAGES):
-        img = TRAIN_IMAGES / fname
-        lbl = TRAIN_LABELS / f"{Path(fname).stem}.txt"
+    for file_name in os.listdir(TRAIN_IMAGES):
+        img = TRAIN_IMAGES / file_name
+        lbl = TRAIN_LABELS / f"{Path(file_name).stem}.txt"
         rename_and_merge(img, lbl, TRAIN_IMAGES, TRAIN_LABELS)
 
-    for fname in os.listdir(VAL_IMAGES):
-        img = VAL_IMAGES / fname
-        lbl = VAL_LABELS / f"{Path(fname).stem}.txt"
+    for file_name in os.listdir(VAL_IMAGES):
+        img = VAL_IMAGES / file_name
+        lbl = VAL_LABELS / f"{Path(file_name).stem}.txt"
         rename_and_merge(img, lbl, VAL_IMAGES, VAL_LABELS)
 
-    for fname in os.listdir(TEST_IMAGES):
-        img = TEST_IMAGES / fname
-        lbl = TEST_LABELS / f"{Path(fname).stem}.txt"
+    for file_name in os.listdir(TEST_IMAGES):
+        img = TEST_IMAGES / file_name
+        lbl = TEST_LABELS / f"{Path(file_name).stem}.txt"
         rename_and_merge(img, lbl, TEST_IMAGES, TEST_LABELS)
 
 
@@ -100,9 +103,9 @@ def visualize_dataset():
         img_dir = DATASET / split / "images"
         if not img_dir.exists():
             continue
-        for fname in os.listdir(img_dir):
-            src = img_dir / fname
-            dst = Path("visualized_dataset") / split / fname
+        for file_name in os.listdir(img_dir):
+            src = img_dir / file_name
+            dst = Path("visualized_dataset") / split / file_name
             visualize(src, save_path=dst)
 
 
@@ -193,6 +196,54 @@ def reannotate_persons(images_path, labels_path):
         lbl_path = labels_path / f"{Path(file_name).stem}.txt"
         add_person_labels(img_path, lbl_path, YOLO("models/yolov8l.pt"))
         print(f"{images_path}: {i + 1}/{test_size}")
+
+
+def letterbox(img: np.ndarray, new_shape: Tuple[int, int]) -> Tuple[np.ndarray, float, Tuple[int, int]]:
+    h, w = img.shape[:2]
+    if (h, w) == new_shape:
+        return img, 1.0, (0, 0)
+    ratio = min(new_shape[0] / h, new_shape[1] / w)
+    new_height, new_width = int(round(h * ratio)), int(round(w * ratio))
+    pad_h, pad_w = new_shape[0] - new_height, new_shape[1] - new_width
+    top = pad_h // 2
+    left = pad_w // 2
+    resized = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+    out = np.full((new_shape[0], new_shape[1], 3), 114, dtype=img.dtype)
+    out[top:top + new_height, left:left + new_width] = resized
+    return out, ratio, (left, top)
+
+
+def nms(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float) -> List[int]:
+    if boxes.size == 0:
+        return []
+    boxes = boxes.astype(np.float32, copy=False)
+    scores = scores.astype(np.float32, copy=False)
+    x1, y1, x2, y2 = boxes.T
+    w = np.maximum(0.0, x2 - x1)
+    h = np.maximum(0.0, y2 - y1)
+    valid = np.where((w > 0) & (h > 0))[0]
+    boxes = boxes[valid]
+    scores = scores[valid]
+    if boxes.size == 0:
+        return []
+    x1, y1, x2, y2 = boxes.T
+    areas = (x2 - x1) * (y2 - y1)
+    order = scores.argsort()[::-1]
+    keep = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(i)
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+        ww = np.maximum(0.0, xx2 - xx1)
+        hh = np.maximum(0.0, yy2 - yy1)
+        inter = ww * hh
+        iou = inter / (areas[i] + areas[order[1:]] - inter + 1e-7)
+        order = order[1:][iou <= iou_thresh]
+    map_back = valid[keep]
+    return map_back.tolist()
 
 
 if __name__ == '__main__':

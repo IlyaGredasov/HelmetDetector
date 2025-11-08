@@ -19,7 +19,9 @@ set "ENGINE_PATH=%MODEL_DIR%%MODEL_NAME%.engine"
 python .\onnx_weights_converter.py "%MODEL_PATH%" %IMG_W% %IMG_H%
 
 trtexec --onnx="%ONNX_PATH%" --saveEngine="%ENGINE_PATH%" ^
-  --optShapes=images:%OPT_BATCH%x3x%IMG_H%x%IMG_W% ^
+  --minShapes=images:1x3x%IMG_H%x%IMG_W% ^
+  --optShapes=images:%CAMERAS_COUNT%x3x%IMG_H%x%IMG_W% ^
+  --maxShapes=images:16x3x%IMG_H%x%IMG_W% ^
   --bf16 ^
   --inputIOFormats=fp16:chw ^
   --outputIOFormats=fp16:chw ^

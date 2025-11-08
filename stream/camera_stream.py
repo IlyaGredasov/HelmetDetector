@@ -7,6 +7,7 @@ import grpc
 from config import cfg
 from stream import camera_stream_pb2 as pb
 from stream import camera_stream_pb2_grpc as api
+from utils import letterbox
 
 
 def encode_jpg(img) -> bytes:
@@ -36,7 +37,8 @@ class CameraStream:
                     frame_index = 0
                     continue
 
-                frame = cv2.resize(frame, (cfg.IMG_W, cfg.IMG_H), interpolation=cv2.INTER_LINEAR)
+                frame, _, _ = letterbox(frame, (cfg.IMG_H, cfg.IMG_W))
+
                 yield pb.CameraFrame(
                     camera_id=self.camera_id,
                     frame=encode_jpg(frame),
