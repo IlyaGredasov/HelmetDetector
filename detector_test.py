@@ -25,7 +25,7 @@ def main():
     ap.add_argument("video", type=str)
     args = ap.parse_args()
 
-    det = HelmetDetector(args.engine, det_thresh=0.4, iou_thresh=0.4, img_size=640)
+    det = HelmetDetector(args.engine, det_thresh=0.4, iou_thresh=0.4)
 
     try:
         cam_index = int(args.video)

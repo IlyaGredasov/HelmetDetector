@@ -24,12 +24,8 @@ class HelmetServerVisualizer:
                 return rows, cols
         return n, 1
 
-    def visualize(
-            self,
-            camera_ids: Sequence[int],
-            images: Sequence[np.ndarray],
-            detections_batch: Sequence[Sequence[Detection]],
-    ) -> None:
+    def visualize(self, camera_ids: Sequence[int], images: Sequence[np.ndarray],
+                  detections_batch: Sequence[Sequence[Detection]], alarm_levels: Sequence[float]) -> None:
         if not images:
             return
 
@@ -39,7 +35,7 @@ class HelmetServerVisualizer:
 
         grid = np.zeros((grid_h, grid_w, 3), dtype=images[0].dtype)
 
-        for camera_id, img, detections in zip(camera_ids, images, detections_batch):
+        for camera_id, img, detections, alarm_level in zip(camera_ids, images, detections_batch, alarm_levels):
             if camera_id >= self.rows * self.cols:
                 break
 
@@ -66,6 +62,12 @@ class HelmetServerVisualizer:
                 2,
                 cv2.LINE_AA,
             )
+
+            alarm_txt = f"{alarm_level:.2f}"
+            color = (0, 255, 0) if alarm_level < 0.5 else (0, 165, 255) if alarm_level < 0.8 else (0, 0, 255)
+            cv2.rectangle(tile, (w - tw - 12, 0), (w, th + 8), (0, 0, 0), -1)
+            cv2.putText(tile, alarm_txt, (w - tw - 6, th + 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
 
             for det in detections:
                 x1, y1, x2, y2 = det.x1, det.y1, det.x2, det.y2

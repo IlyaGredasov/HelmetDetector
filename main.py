@@ -1,4 +1,7 @@
 import asyncio
+import os
+
+import uvicorn
 
 from config import cfg
 from inference.helmet_detector import HelmetDetector
@@ -6,9 +9,15 @@ from server.helmet_server import HelmetServer
 from stream.camera_stream import CameraStream
 
 
-async def run_camera(camera: CameraStream, address: str, delay: float) -> None:
+async def run_camera_stream(camera: CameraStream, address: str, delay: float) -> None:
     await asyncio.sleep(delay)
     await camera.stream_to(address)
+
+
+async def run_helmet_db_api():
+    config = uvicorn.Config("db.helmet_db_api:helmet_db_api", host=cfg.DB_API_HOST, port=cfg.DB_API_PORT, reload=False)
+    server = uvicorn.Server(config)
+    await server.serve()
 
 
 async def main():
@@ -21,30 +30,34 @@ async def main():
     helmet_server = HelmetServer(
         detector=helmet_detector,
         cameras_count=cfg.CAMERAS_COUNT,
-        is_visualizing=True,
+        db_api_url=f"http://{cfg.DB_API_HOST}:{cfg.DB_API_PORT}",
+        alarm_factor=cfg.ALARM_FACTOR,
+        alarm_thresh=cfg.ALARM_THRESH,
+        is_visualizing=cfg.VISUALIZE
     )
     await helmet_server.start(cfg.SERVER_BIND_ADDR)
 
     try:
         async with asyncio.TaskGroup() as tg:
-            tg.create_task(helmet_server.wait())
-            tg.create_task(helmet_server.inference_loop())
-
+            tg.create_task(run_helmet_db_api())
             for i in range(cfg.CAMERAS_COUNT):
                 cam = CameraStream(
                     camera_id=i,
-                    video="report_data/test_videos/test_helmet.mp4",
+                    video="report_data/test_videos/test_hat.mp4",
                     timeout=cfg.CAMERA_TIMEOUT,
                 )
                 start_delay = i * cfg.CAMERA_TIMEOUT / cfg.CAMERAS_COUNT
                 tg.create_task(
-                    run_camera(cam, cfg.CLIENT_TARGET_ADDR, start_delay),
+                    run_camera_stream(cam, cfg.CLIENT_TARGET_ADDR, start_delay),
                     name=f"camera_{i}",
                 )
+            tg.create_task(helmet_server.wait())
+            tg.create_task(helmet_server.inference_loop())
     finally:
         await helmet_server.stop()
-        await asyncio.sleep(0)
 
 
 if __name__ == "__main__":
+    if os.name == "nt":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
