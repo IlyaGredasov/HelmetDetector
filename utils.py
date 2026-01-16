@@ -21,7 +21,12 @@ TEST_LABELS = DATASET / "test" / "labels"
 
 def rename_and_merge(image_path: Path, label_path: Path, dest_images: Path, dest_labels: Path):
     """
-    Allow to rename image with corresponding label
+    Переименовывает пару (image + label) в общий формат.
+
+    :param image_path: путь к изображению
+    :param label_path: путь к меткам
+    :param dest_images: директория назначения для изображений
+    :param dest_labels: директория назначения для меток
     :return: None
     """
     global global_counter
@@ -40,7 +45,8 @@ def rename_and_merge(image_path: Path, label_path: Path, dest_images: Path, dest
 
 def rename_files():
     """
-    Launch renaming process over all images in the dataset
+    Переименовывает все данные в train/valid/test наборах.
+
     :return: None
     """
     global global_counter
@@ -62,10 +68,11 @@ def rename_files():
 
 def visualize(img_path, save_path=None):
     """
-    Make image visualization based on label
-    :param img_path: image path
-    :param save_path: if it is not None, function saves visualized image on this path
-    :return: None
+    Визуализирует разметку YOLO на изображении.
+
+    :param img_path: путь к изображению
+    :param save_path: если указан — сохранит результат
+    :return: изображение с отрисованными метками
     """
     p = Path(img_path)
     lbl_path = p.parent.parent / "labels" / f"{p.stem}.txt"
@@ -96,7 +103,8 @@ def visualize(img_path, save_path=None):
 
 def visualize_dataset():
     """
-    Make dataset visualization based on label
+    Визуализирует весь датасет (train/valid/test).
+
     :return: None
     """
     for split in ['train', 'valid', 'test']:
@@ -111,10 +119,11 @@ def visualize_dataset():
 
 def process_labels(dir_path, unwanted_ids=None, replace_map=None):
     """
-    Change image labels
-    :param dir_path: directory path
-    :param unwanted_ids: class ids to be deleted
-    :param replace_map: class ids to be replaced
+    Массово изменяет метки YOLO.
+
+    :param dir_path: директория с .txt файлами
+    :param unwanted_ids: классы для удаления
+    :param replace_map: таблица замен классов
     :return: None
     """
     p = Path(dir_path)
@@ -143,7 +152,10 @@ def process_labels(dir_path, unwanted_ids=None, replace_map=None):
 
 def clear_labels(dir_path, unwanted_ids):
     """
-    Delete unwanted labels
+    Удаляет выбранные классы из всех меток.
+
+    :param dir_path: директория
+    :param unwanted_ids: классы для удаления
     :return: None
     """
     process_labels(dir_path, unwanted_ids=unwanted_ids)
@@ -151,7 +163,11 @@ def clear_labels(dir_path, unwanted_ids):
 
 def change_label(dir_path, old_id, new_id):
     """
-    Replace old label with new label
+    Заменяет один класс на другой.
+
+    :param dir_path: директория
+    :param old_id: исходный класс
+    :param new_id: новый класс
     :return: None
     """
     process_labels(dir_path, replace_map={old_id: new_id})
@@ -159,8 +175,15 @@ def change_label(dir_path, old_id, new_id):
 
 def xyxy_to_yolo(x1, y1, x2, y2, w, h):
     """
-    Convert xyxy-format coordinates to yolo-format coordinates
-    :return: tuple of coordinates
+    Переводит координаты из одного формата, в другой (xyxy -> xywh)
+
+    :param x1: левый X
+    :param y1: верхний Y
+    :param x2: правый X
+    :param y2: нижний Y
+    :param w: ширина изображения
+    :param h: высота изображения
+    :return: координаты YOLO
     """
     bw, bh = (x2 - x1) / w, (y2 - y1) / h
     cx, cy = (x1 + x2) / (2 * w), (y1 + y2) / (2 * h)
@@ -170,7 +193,15 @@ def xyxy_to_yolo(x1, y1, x2, y2, w, h):
 def add_person_labels(image_path: Path, label_path: Path, model: YOLO, target_class_id: int = 1,
                       source_class_id: int = 0, conf: float = 0.4, iou: float = 0.45):
     """
-    Add person labels to image
+    Добавляет разметку класса "person" к изображению (с использованием YOLO).
+
+    :param image_path: путь к изображению
+    :param label_path: путь к .txt меткам
+    :param model: модель YOLO
+    :param target_class_id: ID класса назначения
+    :param source_class_id: какой класс берем из модели
+    :param conf: порог уверенности
+    :param iou: порог NMS
     :return: None
     """
     img = cv2.imread(str(image_path))
@@ -187,7 +218,10 @@ def add_person_labels(image_path: Path, label_path: Path, model: YOLO, target_cl
 
 def reannotate_persons(images_path, labels_path):
     """
-    Reannotate person labels over all the dataset
+    Переаннотирует весь датасет классом "person".
+
+    :param images_path: директория с изображениями
+    :param labels_path: директория с метками
     :return: None
     """
     test_size = len(os.listdir(images_path))
@@ -199,6 +233,13 @@ def reannotate_persons(images_path, labels_path):
 
 
 def letterbox(img: np.ndarray, new_shape: Tuple[int, int]) -> Tuple[np.ndarray, float, Tuple[int, int]]:
+    """
+    Выполняет letterbox-resize изображения.
+
+    :param img: входное изображение
+    :param new_shape: требуемый размер (h, w)
+    :return: измененное изображение, масштаб, паддинги
+    """
     h, w = img.shape[:2]
     if (h, w) == new_shape:
         return img, 1.0, (0, 0)
@@ -214,6 +255,14 @@ def letterbox(img: np.ndarray, new_shape: Tuple[int, int]) -> Tuple[np.ndarray, 
 
 
 def nms(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float) -> List[int]:
+    """
+    Выполняет классическое NMS (Non-Maximum Suppression).
+
+    :param boxes: массив боксов
+    :param scores: уверенности
+    :param iou_thresh: порог IoU
+    :return: индексы выбранных боксов
+    """
     if boxes.size == 0:
         return []
     boxes = boxes.astype(np.float32, copy=False)

@@ -15,6 +15,16 @@ from utils import nms
 
 @dataclass
 class Detection:
+    """
+    Структура результата детекции.
+
+    :param x1: левый верхний X
+    :param y1: левый верхний Y
+    :param x2: правый нижний X
+    :param y2: правый нижний Y
+    :param confidence: уверенность модели
+    :param class_id: ID класса
+    """
     x1: int
     y1: int
     x2: int
@@ -31,6 +41,14 @@ class HelmetDetector:
     }
 
     def __init__(self, engine_path: str, det_thresh: float = 0.4, iou_thresh: float = 0.45):
+        """
+        Инициализирует детектор и загружает TensorRT-движок.
+
+        :param engine_path: путь к .engine файлу
+        :param det_thresh: порог уверенности
+        :param iou_thresh: порог IoU для NMS
+        :return: экземпляр детектора
+        """
         self.det_thresh = det_thresh
         self.iou_thresh = iou_thresh
         with open(engine_path, "rb") as f:
@@ -43,6 +61,8 @@ class HelmetDetector:
         self.output_name = self.engine.get_tensor_name(1)
         self.input_np_dtype = self.DTYPE_MAP[self.engine.get_tensor_dtype(self.input_name)]
         self.output_np_dtype = self.DTYPE_MAP[self.engine.get_tensor_dtype(self.output_name)]
+
+        # Память будет выделена при первом вызове forward()
         self.last_shape = None
         self.h_input = None
         self.h_output = None
@@ -51,7 +71,14 @@ class HelmetDetector:
         self.event = cuda.Event()
 
     def preprocess(self, images: List[np.ndarray]) -> Tuple[
-        np.ndarray, List[Tuple[int, int]], List[float], List[Tuple[int, int]]]:
+        np.ndarray, List[Tuple[int, int]], List[float], List[Tuple[int, int]]
+    ]:
+        """
+        Подготавливает изображения для модели.
+
+        :param images: список изображений BGR
+        :return: батч, оригинальные размеры, коэффициенты масштабирования, паддинги
+        """
         batch = np.empty((len(images), 3, cfg.IMG_H, cfg.IMG_W), dtype=self.input_np_dtype)
         orig_shapes, scales, paddings = [], [], []
         for i, im_bgr in enumerate(images):
@@ -66,10 +93,19 @@ class HelmetDetector:
         return batch, orig_shapes, scales, paddings
 
     def provide_memory(self, input_shape):
+        """
+        Выделяет или переиспользует CUDA-память под входы и выходы.
+
+        :param input_shape: форма входного батча
+        :return: None
+        """
         if self.last_shape == input_shape:
-            return
+            return  # Память уже выделена корректного размера
+
         self.context.set_input_shape(self.input_name, input_shape)
         output_shape = tuple(self.context.get_tensor_shape(self.output_name))
+
+        # pagelocked память закрепляет определенную страницу в ОС для более быстрого копирования на GPU
         self.h_input = cuda.pagelocked_empty(input_shape, dtype=self.input_np_dtype)
         self.h_output = cuda.pagelocked_empty(output_shape, dtype=self.output_np_dtype)
         if self.d_input:
@@ -83,17 +119,38 @@ class HelmetDetector:
         self.last_shape = input_shape
 
     def forward(self, batch: np.ndarray) -> np.ndarray:
+        """
+        Выполняет прямой проход модели.
+
+        :param batch: входной батч изображений
+        :return: выход модели
+        """
         self.provide_memory(tuple(batch.shape))
         np.copyto(self.h_input, batch, casting='no')
         cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
         self.context.execute_async_v3(stream_handle=int(self.stream.handle))
         cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
-        self.event.record(self.stream)
+        self.event.record(self.stream)  # event для завершения Async CUDA операций
         self.event.synchronize()
         return self.h_output.copy()
 
-    def postprocess(self, output: np.ndarray, original_shapes: List[Tuple[int, int]], scales: List[float],
-                    paddings: List[Tuple[int, int]]) -> List[List[Detection]]:
+    def postprocess(
+            self,
+            output: np.ndarray,
+            original_shapes: List[Tuple[int, int]],
+            scales: List[float],
+            paddings: List[Tuple[int, int]]
+    ) -> List[List[Detection]]:
+        """
+        Применяет постобработку выводов модели.
+
+        :param output: сырые выходы модели
+        :param original_shapes: оригинальные размеры изображений
+        :param scales: коэффициенты масштабирования
+        :param paddings: значения паддинга
+        :return: список списков детекций для каждого батча
+        """
+        # Некоторые YOLO имеют транспонированный выход
         if output.shape[1] < output.shape[2]:
             output = np.transpose(output, (0, 2, 1))
 
@@ -101,7 +158,7 @@ class HelmetDetector:
         num_classes = num_channels - 4
 
         xywh = output[..., :4]
-        class_logits = output[..., 4:4 + num_classes]
+        class_logits = output[..., 4:4 + num_classes] # формат логитов - [x, y, w, h, conf_class_1, conf_class_2 ...]
         class_ids = np.argmax(class_logits, axis=-1).astype(np.int32)
         confidences = np.take_along_axis(class_logits, class_ids[..., None], axis=-1)[..., 0]
 
@@ -130,6 +187,8 @@ class HelmetDetector:
 
             boxes[:, [0, 2]] = (boxes[:, [0, 2]] - pad_left) / scale
             boxes[:, [1, 3]] = (boxes[:, [1, 3]] - pad_top) / scale
+
+            # Чистим выходы, чтобы не выходили за границы
             boxes[:, 0::2] = np.clip(boxes[:, 0::2], 0, orig_w)
             boxes[:, 1::2] = np.clip(boxes[:, 1::2], 0, orig_h)
 
@@ -161,11 +220,22 @@ class HelmetDetector:
         return results
 
     def detect(self, images: List[np.ndarray]) -> List[List[Detection]]:
+        """
+        Полный цикл: препроцессинг + инференс + постобработка.
+
+        :param images: список изображений
+        :return: результат детекции
+        """
         batch, orig_shapes, scales, pads = self.preprocess(images)
         out = self.forward(batch)
         return self.postprocess(out, orig_shapes, scales, pads)
 
     def __del__(self):
+        """
+        Освобождает GPU-память.
+
+        :return: None
+        """
         if self.d_input is not None:
             try:
                 self.d_input.free()

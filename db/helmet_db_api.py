@@ -36,6 +36,12 @@ pool: AsyncConnectionPool | None = None
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    """
+    Инициализирует пул соединений к базе данных.
+
+    :param _app: экземпляр FastAPI
+    :return: контекстный менеджер lifespan
+    """
     global pool
     pool = AsyncConnectionPool(
         conninfo=DB_CONFIG,
@@ -55,9 +61,22 @@ helmet_db_api = FastAPI(lifespan=lifespan)
 
 
 class DetectionStatus(BaseModel):
+    """
+    Модель статуса детекции.
+
+    :param status: строковый статус
+    """
     status: Literal["pending", "confirmed", "rejected"]
 
+
 class Detection(DetectionStatus):
+    """
+    Модель детекции.
+
+    :param detection_id: идентификатор детекции
+    :param camera_id: идентификатор камеры
+    :param detection_time: время фиксации
+    """
     detection_id: int
     camera_id: int
     detection_time: datetime
@@ -69,11 +88,30 @@ async def create_detection(
         detection_time: datetime = Form(...),
         image: UploadFile = File(...)
 ):
+    """
+    Создаёт новую детекцию.
+
+    :param camera_id: ID камеры
+    :param detection_time: время фиксации
+    :param image: изображение нарушения
+    :return: созданная детекция
+    """
     data = await image.read()
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
-                "INSERT INTO detections (camera_id, detection_time, image) VALUES (%s,%s,%s) RETURNING detection_id, camera_id, detection_time, status",
+                "SELECT 1 FROM cameras WHERE camera_id = %s",
+                (camera_id,),
+            )
+            row = await cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=400, detail="Unknown camera_id")
+
+            await cur.execute(
+                """
+                INSERT INTO detections (camera_id, detection_time, image)
+                VALUES (%s, %s, %s) RETURNING detection_id, camera_id, detection_time, status
+                """,
                 (camera_id, detection_time, psycopg.Binary(data)),
             )
             row = await cur.fetchone()
@@ -89,6 +127,17 @@ async def list_detections(
         limit: int = Query(50, ge=1),
         order: Literal["asc", "desc"] = Query("desc")
 ):
+    """
+    Возвращает список детекций.
+
+    :param status: фильтр по статусу
+    :param camera_id: фильтр по ID камеры
+    :param time_from: начальное время
+    :param time_to: конечное время
+    :param limit: ограничение количества
+    :param order: порядок сортировки
+    :return: список детекций
+    """
     clauses = []
     params: list = []
     if status:
@@ -121,6 +170,12 @@ async def list_detections(
 
 @helmet_db_api.get("/detections/{detection_id}", response_model=Detection)
 async def get_detection(detection_id: int):
+    """
+    Возвращает информацию о детекции.
+
+    :param detection_id: ID детекции
+    :return: объект детекции
+    """
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -135,6 +190,12 @@ async def get_detection(detection_id: int):
 
 @helmet_db_api.get("/detections/{detection_id}/image")
 async def get_detection_image(detection_id: int):
+    """
+    Возвращает изображение детекции.
+
+    :param detection_id: ID детекции
+    :return: поток изображения
+    """
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute("SELECT image FROM detections WHERE detection_id=%s", (detection_id,))
@@ -147,6 +208,13 @@ async def get_detection_image(detection_id: int):
 
 @helmet_db_api.patch("/detections/{detection_id}/status", response_model=Detection)
 async def update_status(detection_id: int, body: DetectionStatus):
+    """
+    Обновляет статус детекции.
+
+    :param detection_id: ID детекции
+    :param body: новый статус
+    :return: обновлённая детекция
+    """
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -161,6 +229,11 @@ async def update_status(detection_id: int, body: DetectionStatus):
 
 @helmet_db_api.delete("/admin/delete_outdated")
 async def delete_outdated():
+    """
+    Удаляет устаревшие записи.
+
+    :return: статус операции
+    """
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute("DELETE FROM detections WHERE status='rejected'")
@@ -168,6 +241,7 @@ async def delete_outdated():
 
 
 if __name__ == "__main__":
+    # WindowsSelectorEventLoopPolicy — требуется для корректной работы uvicorn под Windows
     if os.name == "nt":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     uvicorn.run("db.helmet_db_api:helmet_db_api", reload=True)

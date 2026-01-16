@@ -8,7 +8,19 @@ from inference.helmet_detector import Detection
 
 
 class HelmetServerVisualizer:
+    """
+    Визуализатор работы сервера в виде сетки из камер.
+
+    :param num_cameras: количество камер
+    """
+
     def __init__(self, num_cameras: int):
+        """
+        Инициализирует визуализатор.
+
+        :param num_cameras: количество камер
+        :return: None
+        """
         self.num_cameras = num_cameras
         self.rows, self.cols = self.compute_grid(num_cameras)
 
@@ -16,6 +28,12 @@ class HelmetServerVisualizer:
 
     @staticmethod
     def compute_grid(n: int) -> tuple[int, int]:
+        """
+        Вычисляет оптимальную сетку (rows, cols) под количество камер.
+
+        :param n: количество камер
+        :return: кортеж (строки, столбцы)
+        """
         if n <= 0:
             return 1, 1
         for rows in range(int(math.isqrt(n)), 0, -1):
@@ -24,8 +42,22 @@ class HelmetServerVisualizer:
                 return rows, cols
         return n, 1
 
-    def visualize(self, camera_ids: Sequence[int], images: Sequence[np.ndarray],
-                  detections_batch: Sequence[Sequence[Detection]], alarm_levels: Sequence[float]) -> None:
+    def visualize(
+            self,
+            camera_ids: Sequence[int],
+            images: Sequence[np.ndarray],
+            detections_batch: Sequence[Sequence[Detection]],
+            alarm_levels: Sequence[float]
+    ) -> None:
+        """
+        Рисует визуализацию всех камер в одной сетке.
+
+        :param camera_ids: ID камер
+        :param images: изображения от камер
+        :param detections_batch: детекции для каждой камеры
+        :param alarm_levels: текущие уровни тревоги
+        :return: None
+        """
         if not images:
             return
 
@@ -52,16 +84,8 @@ class HelmetServerVisualizer:
             cam_label = f"Camera {camera_id}"
             (tw, th), _ = cv2.getTextSize(cam_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
             cv2.rectangle(tile, (0, 0), (tw + 8, th + 8), (0, 0, 0), -1)
-            cv2.putText(
-                tile,
-                cam_label,
-                (4, th + 4),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA,
-            )
+            cv2.putText(tile, cam_label, (4, th + 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
 
             alarm_txt = f"{alarm_level:.2f}"
             color = (0, 255, 0) if alarm_level < 0.5 else (0, 165, 255) if alarm_level < 0.8 else (0, 0, 255)
@@ -78,16 +102,8 @@ class HelmetServerVisualizer:
                 (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
                 ty = max(0, y1 - 4)
                 cv2.rectangle(tile, (x1, ty - th - 6), (x1 + tw + 6, ty), color, -1)
-                cv2.putText(
-                    tile,
-                    txt,
-                    (x1 + 3, ty - 4),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 0, 0),
-                    1,
-                    cv2.LINE_AA,
-                )
+                cv2.putText(tile, txt, (x1 + 3, ty - 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
             grid[frame_y0:frame_y1, frame_x0:frame_x1] = tile
 

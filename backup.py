@@ -12,7 +12,7 @@ def copy_git_folder(target: str):
         shutil.copytree(".git", git_dest, dirs_exist_ok=True)
         print("Copied: .git")
 
-
+# Скрипт для копирования репозитория на флешку и загрузку в GitLab
 def main():
     target = sys.argv[1]
     os.makedirs(target, exist_ok=True)

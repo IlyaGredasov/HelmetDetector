@@ -11,6 +11,13 @@ CLASS_NAMES: list[str] = ["helmet", "head"]
 
 
 def draw(frame_bgr, detections: Iterable[Detection]):
+    """
+    Рисует детекции на кадре.
+
+    :param frame_bgr: изображение BGR
+    :param detections: детекции модели
+    :return: None
+    """
     for d in detections:
         color = (0, 255, 0) if d.class_id == 0 else (0, 128, 255)
         cv2.rectangle(frame_bgr, (d.x1, d.y1), (d.x2, d.y2), color, 2)
@@ -20,6 +27,11 @@ def draw(frame_bgr, detections: Iterable[Detection]):
 
 
 def main():
+    """
+    Запускает детектор на видео или веб-камере.
+
+    :return: None
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("engine", type=str)
     ap.add_argument("video", type=str)
@@ -44,7 +56,8 @@ def main():
         frame_id += 1
         t0 = time.time()
 
-        detections = det.detect([frame_bgr for _ in range(1)])[0]
+        # Оборачиваем один кадр в список, так как детектор работает с батчами
+        detections = det.detect([frame_bgr])[0]
 
         draw(frame_bgr, detections)
 
