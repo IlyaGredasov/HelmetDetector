@@ -158,7 +158,7 @@ class HelmetDetector:
         num_classes = num_channels - 4
 
         xywh = output[..., :4]
-        class_logits = output[..., 4:4 + num_classes] # формат логитов - [x, y, w, h, conf_class_1, conf_class_2 ...]
+        class_logits = output[..., 4:4 + num_classes]  # формат логитов - [x, y, w, h, conf_class_1, conf_class_2 ...]
         class_ids = np.argmax(class_logits, axis=-1).astype(np.int32)
         confidences = np.take_along_axis(class_logits, class_ids[..., None], axis=-1)[..., 0]
 
@@ -236,13 +236,10 @@ class HelmetDetector:
 
         :return: None
         """
-        if self.d_input is not None:
+        for field in ("d_input", "d_output"):
             try:
-                self.d_input.free()
-            except Exception:
-                pass
-        if self.d_output is not None:
-            try:
-                self.d_output.free()
+                field = getattr(self, field, None)
+                if field is not None:
+                    field.free()
             except Exception:
                 pass

@@ -152,7 +152,9 @@ class HelmetServer(api.CameraStreamServiceServicer):
         if img_bytes is None:
             return
 
-        await self.send_detection_to_api(camera_id, detection_time, img_bytes)
+        asyncio.create_task(
+            self.send_detection_to_api(camera_id, detection_time, img_bytes)
+        )
 
     async def start(self, address: str):
         """
@@ -216,6 +218,7 @@ class HelmetServer(api.CameraStreamServiceServicer):
         :return: None
         """
         if self.server is not None:
-            await self.server.stop(grace) # Делается для того, чтобы EventLoop мог отпустить поток и завершить другие операции
+            await self.server.stop(
+                grace)  # Делается для того, чтобы EventLoop мог отпустить поток и завершить другие операции
             self.server = None
             print("[HelmetServer] stopped")
