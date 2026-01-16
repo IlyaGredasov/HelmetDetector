@@ -42,13 +42,8 @@ class HelmetServerVisualizer:
                 return rows, cols
         return n, 1
 
-    def visualize(
-            self,
-            camera_ids: Sequence[int],
-            images: Sequence[np.ndarray],
-            detections_batch: Sequence[Sequence[Detection]],
-            alarm_levels: Sequence[float]
-    ) -> None:
+    def visualize(self, camera_ids: Sequence[int], images: Sequence[np.ndarray],
+                  detections_batch: Sequence[Sequence[Detection]], alarm_levels: Sequence[float]) -> None:
         """
         Рисует визуализацию всех камер в одной сетке.
 

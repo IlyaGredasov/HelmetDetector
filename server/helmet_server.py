@@ -42,13 +42,8 @@ class HelmetServer(api.CameraStreamServiceServicer):
 
         self.blank_frame = np.zeros((cfg.IMG_H, cfg.IMG_W, 3), dtype=np.uint8)
 
-        self.slots: Dict[int, CameraSlot] = {
-            camera_id: CameraSlot(
-                frame=self.blank_frame.copy(),
-                timestamp=None,
-            )
-            for camera_id in range(self.cameras_count)
-        }
+        self.slots: Dict[int, CameraSlot] = {camera_id: CameraSlot(frame=self.blank_frame.copy(), timestamp=None) for
+                                             camera_id in range(self.cameras_count)}
         self.cameras_ids = sorted(self.slots.keys())
         self.visualizer = HelmetServerVisualizer(self.cameras_count) if is_visualizing else None
 
@@ -117,16 +112,9 @@ class HelmetServer(api.CameraStreamServiceServicer):
         :return: None
         """
         try:
-            requests = await self.http_client.post(
-                "/detections",
-                data={
-                    "camera_id": str(camera_id),
-                    "detection_time": detection_time,
-                },
-                files={
-                    "image": ("frame.jpg", img_bytes, "image/jpeg"),
-                },
-            )
+            requests = await self.http_client.post("/detections",
+                                                   data={"camera_id": str(camera_id), "detection_time": detection_time},
+                                                   files={"image": ("frame.jpg", img_bytes, "image/jpeg")})
             requests.raise_for_status()
             data = requests.json()
             print(f"[DB] detection stored id={data['detection_id']}")
@@ -152,9 +140,7 @@ class HelmetServer(api.CameraStreamServiceServicer):
         if img_bytes is None:
             return
 
-        asyncio.create_task(
-            self.send_detection_to_api(camera_id, detection_time, img_bytes)
-        )
+        asyncio.create_task(self.send_detection_to_api(camera_id, detection_time, img_bytes))
 
     async def start(self, address: str):
         """

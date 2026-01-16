@@ -71,8 +71,7 @@ class HelmetDetector:
         self.event = cuda.Event()
 
     def preprocess(self, images: List[np.ndarray]) -> Tuple[
-        np.ndarray, List[Tuple[int, int]], List[float], List[Tuple[int, int]]
-    ]:
+        np.ndarray, List[Tuple[int, int]], List[float], List[Tuple[int, int]]]:
         """
         Подготавливает изображения для модели.
 

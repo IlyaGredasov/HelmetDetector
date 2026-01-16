@@ -62,13 +62,13 @@ async def main():
                 cam = CameraStream(
                     camera_id=i,
                     video="report_data/test_videos/test_hat.mp4",
-                    timeout=cfg.CAMERA_TIMEOUT,
+                    timeout=cfg.CAMERA_TIMEOUT
                 )
                 # Задержка старта — чтобы камеры не отправляли кадры одновременно
                 start_delay = i * cfg.CAMERA_TIMEOUT / cfg.CAMERAS_COUNT
                 tg.create_task(
                     run_camera_stream(cam, cfg.CLIENT_TARGET_ADDR, start_delay),
-                    name=f"camera_{i}",
+                    name=f"camera_{i}"
                 )
             tg.create_task(helmet_server.wait())
             tg.create_task(helmet_server.inference_loop())
