@@ -66,6 +66,7 @@ class DetectionStatus(BaseModel):
 
     :param status: строковый статус
     """
+
     status: Literal["pending", "confirmed", "rejected"]
 
 
@@ -77,6 +78,7 @@ class Detection(DetectionStatus):
     :param camera_id: идентификатор камеры
     :param detection_time: время фиксации
     """
+
     detection_id: int
     camera_id: int
     detection_time: datetime
@@ -84,9 +86,9 @@ class Detection(DetectionStatus):
 
 @helmet_db_api.post("/detections", response_model=Detection)
 async def create_detection(
-        camera_id: int = Form(...),
-        detection_time: datetime = Form(...),
-        image: UploadFile = File(...)
+    camera_id: int = Form(...),
+    detection_time: datetime = Form(...),
+    image: UploadFile = File(...),
 ):
     """
     Создаёт новую детекцию.
@@ -115,17 +117,22 @@ async def create_detection(
                 (camera_id, detection_time, psycopg.Binary(data)),
             )
             row = await cur.fetchone()
-            return Detection(detection_id=row[0], camera_id=row[1], detection_time=row[2], status=row[3])
+            return Detection(
+                detection_id=row[0],
+                camera_id=row[1],
+                detection_time=row[2],
+                status=row[3],
+            )
 
 
 @helmet_db_api.get("/detections", response_model=List[Detection])
 async def list_detections(
-        status: Optional[Literal["pending", "confirmed", "rejected"]] = Query(None),
-        camera_id: Optional[int] = Query(None),
-        time_from: Optional[datetime] = Query(None),
-        time_to: Optional[datetime] = Query(None),
-        limit: int = Query(50, ge=1),
-        order: Literal["asc", "desc"] = Query("desc")
+    status: Optional[Literal["pending", "confirmed", "rejected"]] = Query(None),
+    camera_id: Optional[int] = Query(None),
+    time_from: Optional[datetime] = Query(None),
+    time_to: Optional[datetime] = Query(None),
+    limit: int = Query(50, ge=1),
+    order: Literal["asc", "desc"] = Query("desc"),
 ):
     """
     Возвращает список детекций.
@@ -165,7 +172,12 @@ async def list_detections(
         async with conn.cursor() as cur:
             await cur.execute(sql, params)
             rows = await cur.fetchall()
-            return [Detection(detection_id=r[0], camera_id=r[1], detection_time=r[2], status=r[3]) for r in rows]
+            return [
+                Detection(
+                    detection_id=r[0], camera_id=r[1], detection_time=r[2], status=r[3]
+                )
+                for r in rows
+            ]
 
 
 @helmet_db_api.get("/detections/{detection_id}", response_model=Detection)
@@ -185,7 +197,12 @@ async def get_detection(detection_id: int):
             row = await cur.fetchone()
             if not row:
                 raise HTTPException(404, "Not found")
-            return Detection(detection_id=row[0], camera_id=row[1], detection_time=row[2], status=row[3])
+            return Detection(
+                detection_id=row[0],
+                camera_id=row[1],
+                detection_time=row[2],
+                status=row[3],
+            )
 
 
 @helmet_db_api.get("/detections/{detection_id}/image")
@@ -198,7 +215,9 @@ async def get_detection_image(detection_id: int):
     """
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute("SELECT image FROM detections WHERE detection_id=%s", (detection_id,))
+            await cur.execute(
+                "SELECT image FROM detections WHERE detection_id=%s", (detection_id,)
+            )
             row = await cur.fetchone()
             if not row:
                 raise HTTPException(404, "Not found")
@@ -224,7 +243,12 @@ async def update_status(detection_id: int, body: DetectionStatus):
             row = await cur.fetchone()
             if not row:
                 raise HTTPException(404, "Not found")
-            return Detection(detection_id=row[0], camera_id=row[1], detection_time=row[2], status=row[3])
+            return Detection(
+                detection_id=row[0],
+                camera_id=row[1],
+                detection_time=row[2],
+                status=row[3],
+            )
 
 
 @helmet_db_api.delete("/admin/delete_outdated")

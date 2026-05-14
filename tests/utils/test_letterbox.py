@@ -37,7 +37,10 @@ def test_letterbox_padding_keeps_content_centered():
     img[10:20, 3:7] = 255
     new_img, ratio, paddings = letterbox(img, (60, 60))
     left, top = paddings
-    content = new_img[top + int(10 * ratio):top + int(20 * ratio), left + int(3 * ratio):left + int(7 * ratio)]
+    content = new_img[
+        top + int(10 * ratio) : top + int(20 * ratio),
+        left + int(3 * ratio) : left + int(7 * ratio),
+    ]
     assert content.mean() > 200
 
 

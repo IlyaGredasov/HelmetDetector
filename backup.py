@@ -18,7 +18,9 @@ def main():
     target = sys.argv[1]
     os.makedirs(target, exist_ok=True)
 
-    result = subprocess.run(["git", "ls-files"], capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        ["git", "ls-files"], capture_output=True, text=True, check=True
+    )
 
     print(f"Copying tracked files to {target}")
 

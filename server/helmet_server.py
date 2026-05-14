@@ -30,8 +30,15 @@ class HelmetServer(api.CameraStreamServiceServicer):
     :param is_visualizing: флаг включения визуализации
     """
 
-    def __init__(self, detector: HelmetDetector, cameras_count: int, db_api_url: str, alarm_factor: float = 0.5,
-                 alarm_thresh: float = 0.8, is_visualizing: bool = False):
+    def __init__(
+        self,
+        detector: HelmetDetector,
+        cameras_count: int,
+        db_api_url: str,
+        alarm_factor: float = 0.5,
+        alarm_thresh: float = 0.8,
+        is_visualizing: bool = False,
+    ):
         super().__init__()
         self.server: grpc.aio.Server | None = None
 
@@ -42,14 +49,20 @@ class HelmetServer(api.CameraStreamServiceServicer):
 
         self.blank_frame = np.zeros((cfg.IMG_H, cfg.IMG_W, 3), dtype=np.uint8)
 
-        self.slots: Dict[int, CameraSlot] = {camera_id: CameraSlot(frame=self.blank_frame.copy(), timestamp=None) for
-                                             camera_id in range(self.cameras_count)}
+        self.slots: Dict[int, CameraSlot] = {
+            camera_id: CameraSlot(frame=self.blank_frame.copy(), timestamp=None)
+            for camera_id in range(self.cameras_count)
+        }
         self.cameras_ids = sorted(self.slots.keys())
-        self.visualizer = HelmetServerVisualizer(self.cameras_count) if is_visualizing else None
+        self.visualizer = (
+            HelmetServerVisualizer(self.cameras_count) if is_visualizing else None
+        )
 
         self.alarm_factor = alarm_factor
         self.alarm_thresh = alarm_thresh
-        self.alarm_levels: Dict[int, float] = {camera_id: 0.0 for camera_id in self.cameras_ids}
+        self.alarm_levels: Dict[int, float] = {
+            camera_id: 0.0 for camera_id in self.cameras_ids
+        }
 
         self.http_client = AsyncClient(base_url=db_api_url, timeout=5.0)
 
@@ -66,7 +79,9 @@ class HelmetServer(api.CameraStreamServiceServicer):
                 if msg.camera_id not in self.slots:
                     continue
 
-                img = cv2.imdecode(np.frombuffer(msg.frame, np.uint8), cv2.IMREAD_COLOR_BGR)
+                img = cv2.imdecode(
+                    np.frombuffer(msg.frame, np.uint8), cv2.IMREAD_COLOR_BGR
+                )
                 if img is None:
                     continue
 
@@ -102,7 +117,9 @@ class HelmetServer(api.CameraStreamServiceServicer):
         img_bytes = bytes(buf)
         return img_bytes, timestamp or datetime.now(timezone.utc).isoformat()
 
-    async def send_detection_to_api(self, camera_id: int, detection_time: str, img_bytes: bytes):
+    async def send_detection_to_api(
+        self, camera_id: int, detection_time: str, img_bytes: bytes
+    ):
         """
         Отправляет детекцию в API базы данных.
 
@@ -112,16 +129,20 @@ class HelmetServer(api.CameraStreamServiceServicer):
         :return: None
         """
         try:
-            requests = await self.http_client.post("/detections",
-                                                   data={"camera_id": str(camera_id), "detection_time": detection_time},
-                                                   files={"image": ("frame.jpg", img_bytes, "image/jpeg")})
+            requests = await self.http_client.post(
+                "/detections",
+                data={"camera_id": str(camera_id), "detection_time": detection_time},
+                files={"image": ("frame.jpg", img_bytes, "image/jpeg")},
+            )
             requests.raise_for_status()
             data = requests.json()
             print(f"[DB] detection stored id={data['detection_id']}")
         except httpx.HTTPError as e:
             print(f"[DB] failed to store detection: {e}")
 
-    async def handle_alarm(self, camera_id: int, timestamp: str, detections: list[Detection], level: float):
+    async def handle_alarm(
+        self, camera_id: int, timestamp: str, detections: list[Detection], level: float
+    ):
         """
         Обрабатывает срабатывание тревоги по камере.
 
@@ -136,11 +157,15 @@ class HelmetServer(api.CameraStreamServiceServicer):
             f"level={level:.3f}, detections={len(detections)}"
         )
 
-        img_bytes, detection_time = await self.prepare_detection_data(camera_id, timestamp)
+        img_bytes, detection_time = await self.prepare_detection_data(
+            camera_id, timestamp
+        )
         if img_bytes is None:
             return
 
-        asyncio.create_task(self.send_detection_to_api(camera_id, detection_time, img_bytes))
+        asyncio.create_task(
+            self.send_detection_to_api(camera_id, detection_time, img_bytes)
+        )
 
     async def start(self, address: str):
         """
@@ -164,13 +189,23 @@ class HelmetServer(api.CameraStreamServiceServicer):
         print("[HelmetServer] inference loop started")
         while True:
             async with self.lock:
-                images = [self.slots[camera_id].frame.copy() for camera_id in self.cameras_ids]
-                timestamps = [self.slots[camera_id].timestamp or "" for camera_id in self.cameras_ids]
+                images = [
+                    self.slots[camera_id].frame.copy() for camera_id in self.cameras_ids
+                ]
+                timestamps = [
+                    self.slots[camera_id].timestamp or ""
+                    for camera_id in self.cameras_ids
+                ]
             detections_batch = self.detector.detect(images)
-            for camera_id, timestamp, detections in zip(self.cameras_ids, timestamps, detections_batch):
+            for camera_id, timestamp, detections in zip(
+                self.cameras_ids, timestamps, detections_batch
+            ):
                 has_head = any(d.class_id == 1 for d in detections)
                 # Экспоненциальное сглаживание уровня тревоги по детекциям
-                level = self.alarm_factor * int(has_head) + (1.0 - self.alarm_factor) * self.alarm_levels[camera_id]
+                level = (
+                    self.alarm_factor * int(has_head)
+                    + (1.0 - self.alarm_factor) * self.alarm_levels[camera_id]
+                )
                 self.alarm_levels[camera_id] = level
 
                 print(
@@ -184,7 +219,9 @@ class HelmetServer(api.CameraStreamServiceServicer):
 
             if self.visualizer is not None:
                 alarm_levels = [self.alarm_levels[cid] for cid in self.cameras_ids]
-                self.visualizer.visualize(self.cameras_ids, images, detections_batch, alarm_levels)
+                self.visualizer.visualize(
+                    self.cameras_ids, images, detections_batch, alarm_levels
+                )
 
             await asyncio.sleep(cfg.CAMERA_TIMEOUT)
 
@@ -205,6 +242,7 @@ class HelmetServer(api.CameraStreamServiceServicer):
         """
         if self.server is not None:
             await self.server.stop(
-                grace)  # Делается для того, чтобы EventLoop мог отпустить поток и завершить другие операции
+                grace
+            )  # Делается для того, чтобы EventLoop мог отпустить поток и завершить другие операции
             self.server = None
             print("[HelmetServer] stopped")

@@ -11,5 +11,6 @@ class CameraSlot:
     :param frame: изображение кадра
     :param timestamp: строковая метка времени или None
     """
+
     frame: np.ndarray
     timestamp: str | None

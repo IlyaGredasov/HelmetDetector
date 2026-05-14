@@ -9,8 +9,8 @@ load_dotenv(find_dotenv(usecwd=True))
 
 @dataclass(frozen=True)
 class Config:
-    IMG_H: int = int(os.getenv('IMG_H', 640))
-    IMG_W: int = int(os.getenv('IMG_W', 640))
+    IMG_H: int = int(os.getenv("IMG_H", 640))
+    IMG_W: int = int(os.getenv("IMG_W", 640))
 
     CAMERAS_COUNT: int = int(os.getenv("CAMERAS_COUNT", 6))
     CAMERA_TIMEOUT: float = float(os.getenv("CAMERA_TIMEOUT", 1))

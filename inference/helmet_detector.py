@@ -4,7 +4,6 @@ from typing import Tuple
 
 import cv2
 import numpy as np
-import pycuda.autoinit
 import pycuda.driver as cuda
 import tensorrt as trt
 
@@ -25,6 +24,7 @@ class Detection:
     :param confidence: уверенность модели
     :param class_id: ID класса
     """
+
     x1: int
     y1: int
     x2: int
@@ -40,7 +40,9 @@ class HelmetDetector:
         trt.DataType.BF16: np.float16,
     }
 
-    def __init__(self, engine_path: str, det_thresh: float = 0.4, iou_thresh: float = 0.45):
+    def __init__(
+        self, engine_path: str, det_thresh: float = 0.4, iou_thresh: float = 0.45
+    ):
         """
         Инициализирует детектор и загружает TensorRT-движок.
 
@@ -52,15 +54,21 @@ class HelmetDetector:
         self.det_thresh = det_thresh
         self.iou_thresh = iou_thresh
         with open(engine_path, "rb") as f:
-            self.engine: trt.ICudaEngine = trt.Runtime(trt.Logger(trt.Logger.WARNING)).deserialize_cuda_engine(f.read())
+            self.engine: trt.ICudaEngine = trt.Runtime(
+                trt.Logger(trt.Logger.WARNING)
+            ).deserialize_cuda_engine(f.read())
         if self.engine is None:
             raise RuntimeError("Failed to deserialize TensorRT engine")
         self.context = self.engine.create_execution_context()
         self.stream = cuda.Stream()
         self.input_name = self.engine.get_tensor_name(0)
         self.output_name = self.engine.get_tensor_name(1)
-        self.input_np_dtype = self.DTYPE_MAP[self.engine.get_tensor_dtype(self.input_name)]
-        self.output_np_dtype = self.DTYPE_MAP[self.engine.get_tensor_dtype(self.output_name)]
+        self.input_np_dtype = self.DTYPE_MAP[
+            self.engine.get_tensor_dtype(self.input_name)
+        ]
+        self.output_np_dtype = self.DTYPE_MAP[
+            self.engine.get_tensor_dtype(self.output_name)
+        ]
 
         # Память будет выделена при первом вызове forward()
         self.last_shape = None
@@ -70,15 +78,18 @@ class HelmetDetector:
         self.d_output = None
         self.event = cuda.Event()
 
-    def preprocess(self, images: List[np.ndarray]) -> Tuple[
-        np.ndarray, List[Tuple[int, int]], List[float], List[Tuple[int, int]]]:
+    def preprocess(
+        self, images: List[np.ndarray]
+    ) -> Tuple[np.ndarray, List[Tuple[int, int]], List[float], List[Tuple[int, int]]]:
         """
         Подготавливает изображения для модели.
 
         :param images: список изображений BGR
         :return: батч, оригинальные размеры, коэффициенты масштабирования, паддинги
         """
-        batch = np.empty((len(images), 3, cfg.IMG_H, cfg.IMG_W), dtype=self.input_np_dtype)
+        batch = np.empty(
+            (len(images), 3, cfg.IMG_H, cfg.IMG_W), dtype=self.input_np_dtype
+        )
         orig_shapes, scales, paddings = [], [], []
         for i, im_bgr in enumerate(images):
             rgb = cv2.cvtColor(im_bgr, cv2.COLOR_BGR2RGB)
@@ -125,7 +136,7 @@ class HelmetDetector:
         :return: выход модели
         """
         self.provide_memory(tuple(batch.shape))
-        np.copyto(self.h_input, batch, casting='no')
+        np.copyto(self.h_input, batch, casting="no")
         cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
         self.context.execute_async_v3(stream_handle=int(self.stream.handle))
         cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
@@ -134,11 +145,11 @@ class HelmetDetector:
         return self.h_output.copy()
 
     def postprocess(
-            self,
-            output: np.ndarray,
-            original_shapes: List[Tuple[int, int]],
-            scales: List[float],
-            paddings: List[Tuple[int, int]]
+        self,
+        output: np.ndarray,
+        original_shapes: List[Tuple[int, int]],
+        scales: List[float],
+        paddings: List[Tuple[int, int]],
     ) -> List[List[Detection]]:
         """
         Применяет постобработку выводов модели.
@@ -157,9 +168,13 @@ class HelmetDetector:
         num_classes = num_channels - 4
 
         xywh = output[..., :4]
-        class_logits = output[..., 4:4 + num_classes]  # формат логитов - [x, y, w, h, conf_class_1, conf_class_2 ...]
+        class_logits = output[
+            ..., 4 : 4 + num_classes
+        ]  # формат логитов - [x, y, w, h, conf_class_1, conf_class_2 ...]
         class_ids = np.argmax(class_logits, axis=-1).astype(np.int32)
-        confidences = np.take_along_axis(class_logits, class_ids[..., None], axis=-1)[..., 0]
+        confidences = np.take_along_axis(class_logits, class_ids[..., None], axis=-1)[
+            ..., 0
+        ]
 
         x, y, w, h = np.split(xywh, 4, axis=-1)
         x1 = (x - w / 2)[..., 0]

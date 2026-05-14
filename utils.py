@@ -19,7 +19,9 @@ TEST_IMAGES = DATASET / "test" / "images"
 TEST_LABELS = DATASET / "test" / "labels"
 
 
-def rename_and_merge(image_path: Path, label_path: Path, dest_images: Path, dest_labels: Path):
+def rename_and_merge(
+    image_path: Path, label_path: Path, dest_images: Path, dest_labels: Path
+):
     """
     Переименовывает пару (image + label) в общий формат.
 
@@ -90,7 +92,16 @@ def visualize(img_path, save_path=None):
                 (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
                 ty = max(0, y1 - 4)
                 cv2.rectangle(img, (x1, ty - th - 6), (x1 + tw + 6, ty), color, -1)
-                cv2.putText(img, txt, (x1 + 3, ty - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+                cv2.putText(
+                    img,
+                    txt,
+                    (x1 + 3, ty - 4),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 0, 0),
+                    2,
+                    cv2.LINE_AA,
+                )
     if save_path:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(save_path), img)
@@ -107,7 +118,7 @@ def visualize_dataset():
 
     :return: None
     """
-    for split in ['train', 'valid', 'test']:
+    for split in ["train", "valid", "test"]:
         img_dir = DATASET / split / "images"
         if not img_dir.exists():
             continue
@@ -139,7 +150,7 @@ def process_labels(dir_path, unwanted_ids=None, replace_map=None):
                     continue
                 try:
                     cid = int(parts[0])
-                except:
+                except ValueError:
                     continue
                 if cid in unwanted_ids:
                     continue
@@ -190,8 +201,15 @@ def xyxy_to_yolo(x1, y1, x2, y2, w, h):
     return cx, cy, bw, bh
 
 
-def add_person_labels(image_path: Path, label_path: Path, model: YOLO, target_class_id: int = 1,
-                      source_class_id: int = 0, conf: float = 0.4, iou: float = 0.45):
+def add_person_labels(
+    image_path: Path,
+    label_path: Path,
+    model: YOLO,
+    target_class_id: int = 1,
+    source_class_id: int = 0,
+    conf: float = 0.4,
+    iou: float = 0.45,
+):
     """
     Добавляет разметку класса "person" к изображению (с использованием YOLO).
 
@@ -232,7 +250,9 @@ def reannotate_persons(images_path, labels_path):
         print(f"{images_path}: {i + 1}/{test_size}")
 
 
-def letterbox(img: np.ndarray, new_shape: Tuple[int, int]) -> Tuple[np.ndarray, float, Tuple[int, int]]:
+def letterbox(
+    img: np.ndarray, new_shape: Tuple[int, int]
+) -> Tuple[np.ndarray, float, Tuple[int, int]]:
     """
     Выполняет letterbox-resize изображения.
 
@@ -250,7 +270,7 @@ def letterbox(img: np.ndarray, new_shape: Tuple[int, int]) -> Tuple[np.ndarray, 
     left = pad_w // 2
     resized = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
     out = np.full((new_shape[0], new_shape[1], 3), 114, dtype=img.dtype)
-    out[top:top + new_height, left:left + new_width] = resized
+    out[top : top + new_height, left : left + new_width] = resized
     return out, ratio, (left, top)
 
 
@@ -295,7 +315,7 @@ def nms(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float) -> List[int]:
     return map_back.tolist()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     rename_files()
     print("Files have been renamed")
     visualize_dataset()

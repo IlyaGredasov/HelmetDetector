@@ -21,7 +21,9 @@ async def test_prepare_detection_data_success_with_timestamp(monkeypatch):
 
     monkeypatch.setattr(cv2, "imencode", fake_imencode)
 
-    img_bytes, detection_time = await server.prepare_detection_data(1, "2025-01-01T00:00:00Z")
+    img_bytes, detection_time = await server.prepare_detection_data(
+        1, "2025-01-01T00:00:00Z"
+    )
     assert img_bytes == bytes(np.array([1, 2, 3], dtype=np.uint8))
     assert detection_time == "2025-01-01T00:00:00Z"
 

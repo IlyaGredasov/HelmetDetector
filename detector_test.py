@@ -23,7 +23,16 @@ def draw(frame_bgr, detections: Iterable[Detection]):
         cv2.rectangle(frame_bgr, (d.x1, d.y1), (d.x2, d.y2), color, 2)
         y = max(d.y1 - 6, 0)
         label = f"{CLASS_NAMES[d.class_id] if d.class_id < len(CLASS_NAMES) else d.class_id}: {d.confidence:.2f}"
-        cv2.putText(frame_bgr, label, (d.x1, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
+        cv2.putText(
+            frame_bgr,
+            label,
+            (d.x1, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
 
 
 def main():
@@ -62,11 +71,19 @@ def main():
         draw(frame_bgr, detections)
 
         fps = 1.0 / (time.time() - t0)
-        cv2.putText(frame_bgr, f"FPS: {fps:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                    (0, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(
+            frame_bgr,
+            f"FPS: {fps:.1f}",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            (0, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
 
         cv2.imshow("TRT inference", frame_bgr)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     cap.release()
